@@ -56,7 +56,7 @@ class Util
      */
     public static function stripSlashesIfMagicQuotes($rawData, $overrideStripSlashes = null)
     {
-        $strip = is_null($overrideStripSlashes) ? get_magic_quotes_gpc() : $overrideStripSlashes;
+        $strip = is_null($overrideStripSlashes) ? false : $overrideStripSlashes;
         if ($strip) {
             return self::_stripSlashes($rawData);
         } else {
@@ -89,39 +89,37 @@ class Util
      * @return string
      */
     public static function encrypt($data, $key, $iv, $settings = array())
-    {
-        if ($data === '' || !extension_loaded('mcrypt')) {
-            return $data;
-        }
-
-        //Merge settings with defaults
-        $settings = array_merge(array(
-            'algorithm' => MCRYPT_RIJNDAEL_256,
-            'mode' => MCRYPT_MODE_CBC
-        ), $settings);
-
-        //Get module
-        $module = mcrypt_module_open($settings['algorithm'], '', $settings['mode'], '');
-
-        //Validate IV
-        $ivSize = mcrypt_enc_get_iv_size($module);
-        if (strlen($iv) > $ivSize) {
-            $iv = substr($iv, 0, $ivSize);
-        }
-
-        //Validate key
-        $keySize = mcrypt_enc_get_key_size($module);
-        if (strlen($key) > $keySize) {
-            $key = substr($key, 0, $keySize);
-        }
-
-        //Encrypt value
-        mcrypt_generic_init($module, $key, $iv);
-        $res = @mcrypt_generic($module, $data);
-        mcrypt_generic_deinit($module);
-
-        return $res;
+{
+    if ($data === '' || !extension_loaded('openssl')) {
+        return $data;
     }
+
+    // Merge settings with defaults
+    $settings = array_merge(array(
+        'algorithm' => 'aes-256-cbc'
+    ), $settings);
+
+    // Validate IV
+    $ivSize = openssl_cipher_iv_length($settings['algorithm']);
+    if (strlen($iv) > $ivSize) {
+        $iv = substr($iv, 0, $ivSize);
+    }
+
+    // Validate key
+    $keySize = 32; // aes-256-cbc usa uma chave de 256 bits, ou seja, 32 bytes
+    if (strlen($key) > $keySize) {
+        $key = substr($key, 0, $keySize);
+    }
+
+    // Encrypt value
+    $encryptedData = openssl_encrypt($data, $settings['algorithm'], $key, OPENSSL_RAW_DATA, $iv);
+    if ($encryptedData === false) {
+        return ''; // Ou trate o erro conforme necessário
+    }
+
+    return $encryptedData;
+}
+
 
     /**
      * Decrypt data
@@ -138,40 +136,37 @@ class Util
      * @return string
      */
     public static function decrypt($data, $key, $iv, $settings = array())
-    {
-        if ($data === '' || !extension_loaded('mcrypt')) {
-            return $data;
-        }
-
-        //Merge settings with defaults
-        $settings = array_merge(array(
-            'algorithm' => MCRYPT_RIJNDAEL_256,
-            'mode' => MCRYPT_MODE_CBC
-        ), $settings);
-
-        //Get module
-        $module = mcrypt_module_open($settings['algorithm'], '', $settings['mode'], '');
-
-        //Validate IV
-        $ivSize = mcrypt_enc_get_iv_size($module);
-        if (strlen($iv) > $ivSize) {
-            $iv = substr($iv, 0, $ivSize);
-        }
-
-        //Validate key
-        $keySize = mcrypt_enc_get_key_size($module);
-        if (strlen($key) > $keySize) {
-            $key = substr($key, 0, $keySize);
-        }
-
-        //Decrypt value
-        mcrypt_generic_init($module, $key, $iv);
-        $decryptedData = @mdecrypt_generic($module, $data);
-        $res = str_replace("\x0", '', $decryptedData);
-        mcrypt_generic_deinit($module);
-
-        return $res;
+{
+    if ($data === '' || !extension_loaded('openssl')) {
+        return $data;
     }
+
+    // Merge settings with defaults
+    $settings = array_merge(array(
+        'algorithm' => 'aes-256-cbc'
+    ), $settings);
+
+    // Validate IV
+    $ivSize = openssl_cipher_iv_length($settings['algorithm']);
+    if (strlen($iv) > $ivSize) {
+        $iv = substr($iv, 0, $ivSize);
+    }
+
+    // Validate key
+    $keySize = 32; // aes-256-cbc usa uma chave de 256 bits, ou seja, 32 bytes
+    if (strlen($key) > $keySize) {
+        $key = substr($key, 0, $keySize);
+    }
+
+    // Decrypt value
+    $decryptedData = openssl_decrypt($data, $settings['algorithm'], $key, OPENSSL_RAW_DATA, $iv);
+    if ($decryptedData === false) {
+        return ''; // Ou trate o erro conforme necessário
+    }
+
+    return rtrim($decryptedData, "\0");
+}
+
 
     /**
      * Encode secure cookie value
